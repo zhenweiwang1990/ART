@@ -1,3 +1,10 @@
+import os
+import sys
+
+# Set environment variables before importing art to avoid unsloth import issues
+# unsloth is Linux-specific and not available on all platforms
+os.environ.setdefault("IMPORT_UNSLOTH", "0")
+
 import art
 import asyncio
 from dotenv import load_dotenv
@@ -19,7 +26,7 @@ load_dotenv()
 agent_002 = art.TrainableModel(
     name="email-agent-002",
     project="email_agent",
-    base_model="Qwen/Qwen2.5-14B-Instruct",
+    base_model="Qwen/Qwen3-14B",
     config=ProjectPolicyConfig(
         max_turns=10,
         log_to_openpipe=True,

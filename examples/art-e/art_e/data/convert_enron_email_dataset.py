@@ -85,6 +85,11 @@ def main():
         default=100,
         help="Maximum number of emails to process (default: 100)",
     )
+    parser.add_argument(
+        "--upload",
+        action="store_true",
+        help="Upload the processed dataset to HuggingFace (requires HF_TOKEN)",
+    )
     args = parser.parse_args()
 
     # Create data directory if it doesn't exist
@@ -99,10 +104,13 @@ def main():
         max_emails=args.max_emails,
     )
 
-    # Upload to HuggingFace
-    upload_to_huggingface(structured_emails)
-
-    print(f"Processing complete. {len(structured_emails)} emails parsed and uploaded.")
+    # Upload to HuggingFace (optional)
+    if args.upload:
+        upload_to_huggingface(structured_emails)
+        print(f"Processing complete. {len(structured_emails)} emails parsed and uploaded.")
+    else:
+        print(f"Processing complete. {len(structured_emails)} emails parsed.")
+        print("Data saved locally. Use --upload flag to upload to HuggingFace.")
 
 
 if __name__ == "__main__":

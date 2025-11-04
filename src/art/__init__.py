@@ -7,7 +7,11 @@ if os.environ.get("IMPORT_PEFT", "0") == "1":
 # Import unsloth before transformers, peft, and trl to maximize Unsloth optimizations
 # NOTE: If we import peft before unsloth to enable sleep mode, a warning will be shown
 if os.environ.get("IMPORT_UNSLOTH", "0") == "1":
-    import unsloth  # type: ignore
+    try:
+        import unsloth  # type: ignore
+    except ImportError:
+        # unsloth is not available (e.g., not on Linux), continue without it
+        pass
 
 from . import dev
 from .gather import gather_trajectories, gather_trajectory_groups

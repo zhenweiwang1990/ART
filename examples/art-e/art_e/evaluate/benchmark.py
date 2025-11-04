@@ -8,11 +8,17 @@ async def benchmark_model(
     model: art.Model, limit: int = 100, swallow_exceptions: bool = True
 ) -> pl.DataFrame:
     val_scenarios = load_synthetic_queries(split="test", limit=limit)
-    val_trajectories = await art.gather_trajectories(
-        (rollout(model, scenario) for scenario in val_scenarios),
-        pbar_desc=f"validation {model.name}",
-        max_exceptions=limit if swallow_exceptions else 0,
-    )
+    # Run sequentially for clearer, easier-to-analyze logs
+    val_trajectories = []
+    for scenario in val_scenarios:
+        try:
+            traj = await rollout(model, scenario)
+            val_trajectories.append(traj)
+        except BaseException as e:
+            if swallow_exceptions:
+                val_trajectories.append(e)
+            else:
+                raise
 
     valid_trajectories = [t for t in val_trajectories if isinstance(t, art.Trajectory)]
 

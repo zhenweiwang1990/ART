@@ -98,8 +98,10 @@ class LocalAPI:
                 if config.get("engine_args", {}).get("enable_sleep_mode", False):
                     os.environ["IMPORT_PEFT"] = "1"
                 # When moving the service to a child process, import unsloth
-                # early to maximize optimizations
-                os.environ["IMPORT_UNSLOTH"] = "1"
+                # early to maximize optimizations (Linux only)
+                import sys
+                if sys.platform == "linux":
+                    os.environ["IMPORT_UNSLOTH"] = "1"
                 self._services[model.name] = move_to_child_process(
                     self._services[model.name],
                     process_name="model-service",

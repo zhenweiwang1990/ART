@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  art-e-training:
+    image: art-e-training:latest
+    container_name: art-e-training
+    
+    # GPU 配置
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    
+    # 环境变量
+    env_file:
+      - .env
+    
+    # 卷挂载
+    volumes:
+      - ./data:/workspace/examples/art-e/data
+      - ./outputs:/workspace/examples/art-e/outputs
+      - ./checkpoints:/workspace/examples/art-e/checkpoints
+      - ./training.log:/workspace/examples/art-e/training.log
+    
+    # 共享内存配置（对大模型训练很重要）
+    shm_size: '16gb'
+    
+    # IPC 模式（提高多进程性能）
+    ipc: host
+    
+    # 重启策略
+    restart: unless-stopped
+    
+    # 标准输入/输出
+    stdin_open: true
+    tty: true
+    
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+

@@ -2,7 +2,6 @@ import art
 from typing import List, Any
 from art_e.data.types_enron import SyntheticQuery
 from art import Trajectory
-from litellm import acompletion
 import litellm
 from art_e.email_search_tools import search_emails, read_email
 from langchain_core.utils.function_calling import convert_to_openai_tool
@@ -163,7 +162,7 @@ tools: list[ChatCompletionToolParam] = [
 
 
 @retry(stop=stop_after_attempt(3))
-async def determine_if_answer_is_correct(answer: str, query: SyntheticQuery) -> bool:
+async def determine_if_answer_is_correct(model: art.Model, answer: str, query: SyntheticQuery) -> bool:
     system_prompt = "You will be given an question and two different answers to the question, the correct answer and the answer given by an AI. Your job is to determine if the answer given by the AI is correct. Return True if the answer is semantically similar to the correct answer, and False otherwise. Return only the word True or False, no other text."
 
     messages = [
@@ -174,8 +173,12 @@ async def determine_if_answer_is_correct(answer: str, query: SyntheticQuery) -> 
         },
     ]
 
-    response = await acompletion(
-        model="gemini/gemini-2.0-flash",
+    # Judge with OpenAI GPT-4o
+    openai_key = os.getenv("OPENAI_API_KEY")
+    response = await litellm.acompletion(
+        model="gpt-4o",
+        base_url="https://api.openai.com/v1",
+        api_key=openai_key,
         messages=messages,
         temperature=0,
         caching=True,
@@ -246,18 +249,27 @@ async def rollout(
         if litellm_model_name is None:
             litellm_model_name = f"hosted_vllm/{model.name}"
 
-        llm_response = await acompletion(
-            model=litellm_model_name,
-            base_url=model.base_url,
-            messages=traj.messages(),
-            caching=not model.trainable,
-            api_key=model.api_key,
-            max_completion_tokens=model.config.max_tokens,
-            tools=tools if model.config.use_tools else None,
-            tool_choice="required"
-            if model.config.use_tools and not model.trainable
-            else None,
-        )  # type: ignore
+        # 安全地获取 trainable 属性（普通 Model 没有此属性）
+        is_trainable = getattr(model, 'trainable', False)
+        
+        # 构建参数字典，根据模型类型调整
+        completion_params = {
+            "model": litellm_model_name,
+            "base_url": model.inference_base_url,
+            "messages": traj.messages(),
+            "caching": not is_trainable,
+            "api_key": model.inference_api_key,
+            "tools": tools if model.config.use_tools else None,
+            "tool_choice": "required" if model.config.use_tools and not is_trainable else None,
+        }
+        
+        # Ollama 使用 max_tokens 而不是 max_completion_tokens
+        if litellm_model_name.startswith("ollama"):
+            completion_params["max_tokens"] = model.config.max_tokens
+        else:
+            completion_params["max_completion_tokens"] = model.config.max_tokens
+        
+        llm_response = await litellm.acompletion(**completion_params)  # type: ignore
 
         assert isinstance(llm_response, ModelResponse)
         rubric.prompt_tokens += llm_response.usage.prompt_tokens  # type: ignore
@@ -268,7 +280,7 @@ async def rollout(
         # Our rollout is only set up to handle one tool call at a time, so just ignore any parallel tool calls.
         if choice.message.tool_calls is not None and len(choice.message.tool_calls) > 1:
             choice.message.tool_calls = choice.message.tool_calls[:1]
-        if model.trainable:
+        if is_trainable:
             traj.messages_and_choices.append(convert_litellm_choice_to_openai(choice))
         else:
             traj.messages_and_choices.append(choice.message.to_dict())  # type: ignore
@@ -369,7 +381,7 @@ async def rollout(
                 else:
                     rubric.attempted_answer = True
                     rubric.answer_correct = await determine_if_answer_is_correct(
-                        final_answer, scenario
+                        model, final_answer, scenario
                     )
                     rubric.sources_correct = scenario.message_ids[0] in final_sources
                 break

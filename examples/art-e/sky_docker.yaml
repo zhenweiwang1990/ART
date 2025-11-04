@@ -1,0 +1,115 @@
+name: art-e-docker-training
+
+resources:
+  accelerators: A100-80GB:1
+  cloud: runpod
+  disk_size: 512
+  # 也可以尝试其他云:
+  # cloud: lambda
+  # cloud: vastai
+
+# 工作目录
+workdir: .
+
+# 文件挂载（上传到云端）
+file_mounts:
+  /root/examples/art-e:
+    source: .
+    # 排除不需要的文件（会自动使用 .dockerignore）
+    excludes:
+      - .venv
+      - __pycache__
+      - data
+      - outputs
+      - checkpoints
+      - "*.log"
+
+# 环境设置
+setup: |
+  set -e
+  
+  echo "📦 安装 Docker（如果需要）..."
+  if ! command -v docker &> /dev/null; then
+    curl -fsSL https://get.docker.com | sh
+    sudo usermod -aG docker $USER
+  fi
+  
+  echo "🐳 检查 NVIDIA Docker..."
+  if ! dpkg -l | grep -q nvidia-docker2; then
+    distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+    curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+    curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
+      sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+    sudo apt-get update
+    sudo apt-get install -y nvidia-docker2
+    sudo systemctl restart docker
+  fi
+  
+  echo "✅ Docker 环境就绪"
+
+# 运行训练
+run: |
+  set -e
+  cd /root/examples/art-e
+  
+  echo "🔨 构建 Docker 镜像..."
+  
+  # 切换到项目根目录进行构建
+  cd /root
+  docker build \
+    -f examples/art-e/Dockerfile \
+    -t art-e-training:latest \
+    .
+  
+  echo "✅ 镜像构建完成"
+  
+  cd /root/examples/art-e
+  
+  echo "📝 创建 .env 文件..."
+  cat > .env << 'EOF'
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+BACKUP_BUCKET=${BACKUP_BUCKET}
+WANDB_API_KEY=${WANDB_API_KEY}
+OPENAI_API_KEY=${OPENAI_API_KEY}
+KAGGLE_USERNAME=${KAGGLE_USERNAME:-}
+KAGGLE_KEY=${KAGGLE_KEY:-}
+RUN_ID=${RUN_ID:-}
+EOF
+  
+  echo "🚀 启动训练容器..."
+  mkdir -p data outputs checkpoints
+  
+  docker run \
+    --name art-e-training \
+    --gpus all \
+    --env-file .env \
+    -v $(pwd)/data:/workspace/examples/art-e/data \
+    -v $(pwd)/outputs:/workspace/examples/art-e/outputs \
+    -v $(pwd)/checkpoints:/workspace/examples/art-e/checkpoints \
+    --shm-size=16g \
+    --ipc=host \
+    --rm \
+    art-e-training:latest
+  
+  echo "✅ 训练完成"
+
+# 环境变量（从本地 .env 或直接填写）
+envs:
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  BACKUP_BUCKET: ${BACKUP_BUCKET}
+  WANDB_API_KEY: ${WANDB_API_KEY}
+  OPENAI_API_KEY: ${OPENAI_API_KEY}
+  KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
+  KAGGLE_KEY: ${KAGGLE_KEY:-}
+  RUN_ID: ${RUN_ID:-}
+
+# 或者手动指定（不推荐，会暴露在配置中）:
+# envs:
+#   AWS_ACCESS_KEY_ID: "your_key_here"
+#   AWS_SECRET_ACCESS_KEY: "your_secret_here"
+#   BACKUP_BUCKET: "your_bucket"
+#   WANDB_API_KEY: "your_key"
+#   OPENAI_API_KEY: "your_key"
+

@@ -37,11 +37,20 @@ def get_model_config(
         max_lora_rank=8,
         use_async=True,
     )
+    # Determine num_scheduler_steps based on device capability
+    # macOS/MPS doesn't support CUDA, so use default of 1
+    num_scheduler_steps = 1  # Default for non-CUDA or older GPUs
+    if torch.cuda.is_available():
+        try:
+            num_scheduler_steps = 16 if torch.cuda.get_device_capability()[0] >= 8 else 1
+        except Exception:
+            num_scheduler_steps = 1
+    
     engine_args = EngineArgs(
         disable_log_requests=True,
         # Multi-step processing is not supported for the Xformers attention backend
         # which is the fallback for devices with compute capability < 8.0
-        num_scheduler_steps=16 if torch.cuda.get_device_capability()[0] >= 8 else 1,
+        num_scheduler_steps=num_scheduler_steps,
         enable_sleep_mode=enable_sleep_mode,
     )
     engine_args.update(config.get("engine_args", {}))

@@ -41,13 +41,47 @@ To generate training data, the system:
 
 ## Installation
 
+### Option A: Docker (推荐 - 环境一致性)
+
+使用 Docker 可以避免复杂的依赖配置，适合云端批量部署：
+
+```bash
+# 1. 构建镜像
+./docker_build.sh
+
+# 2. 配置环境变量
+cp .env.template .env
+# 编辑 .env 文件
+
+# 3. 运行训练
+./docker_run.sh
+
+# 或使用 make 命令
+make build
+make run
+```
+
+📖 **详细文档**: 
+- 完整指南: `DOCKER_TRAINING_GUIDE.md`
+- 快速参考: `DOCKER_QUICK_REF.md`
+
+### Option B: 直接安装（适合本地开发）
+
 ```bash
 # Clone repository
 git clone https://github.com/OpenPipe/ART
-cd ART/examples/jarvis-mail
+cd ART/examples/art-e
 
-# Install package
+# Install package with uv (recommended - creates .venv automatically)
 uv sync
+
+# Activate the virtual environment
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Or if you don't have uv, use pip:
+# python3 -m venv venv
+# source venv/bin/activate
+# pip install -e .
 
 # Create .env file with required variables
 # BACKUP_BUCKET=your-s3-bucket-name
@@ -62,13 +96,16 @@ The following commands were used to create the initial dataset. However, you can
 
 ```bash
 # Download and process the Enron dataset (default: 100 emails)
-python -m email_deep_research.data.convert_enron_email_dataset
+python -m art_e.data.convert_enron_email_dataset
 
 # Process more emails
-python -m email_deep_research.data.convert_enron_email_dataset --max-emails 10000
+python -m art_e.data.convert_enron_email_dataset --max-emails 10000
+
+# Optional: Upload to HuggingFace (requires HF_TOKEN environment variable)
+python -m art_e.data.convert_enron_email_dataset --upload
 
 # Generate SQLite database
-python -c "from email_deep_research.data.local_email_db import generate_database; generate_database(overwrite=True)"
+python -c "from art_e.data.local_email_db import generate_database; generate_database(overwrite=True)"
 ```
 
 ### Training Models
@@ -83,10 +120,12 @@ You can see the other model variants I tried training in `train.py`.
 
 ### Evaluating Models
 
+#### Evaluating Cloud Models (GPT-4o, Claude, etc.)
+
 ```python
 # Benchmark a model
-from email_deep_research.evaluate.benchmark import benchmark_model
-from email_deep_research.project_types import ProjectPolicyConfig
+from art_e.evaluate.benchmark import benchmark_model
+from art_e.project_types import ProjectPolicyConfig
 import asyncio
 import art
 
@@ -104,6 +143,46 @@ model = art.Model(
 results = asyncio.run(benchmark_model(model))
 print(results)
 ```
+
+#### Evaluating Qwen3 Models
+
+**⚠️ 注意**: Email Agent 需要工具调用支持。推荐使用云 API。
+
+**方法 1: DashScope API（阿里云 - 推荐）⭐**
+
+```bash
+# 1. 获取 API Key: https://dashscope.console.aliyun.com/apiKey
+export DASHSCOPE_API_KEY=your_key
+
+# 2. 运行评估
+python -m art_e.evaluate.benchmark_qwen3_dashscope
+```
+
+**方法 2: OpenAI API（如果有 GPT-4 access）**
+
+```bash
+export OPENAI_API_KEY=your_key
+python -m art_e.evaluate.benchmark_openai
+```
+
+**方法 3: vLLM 本地部署（Linux + NVIDIA GPU）**
+
+```bash
+# 1. 启动 vLLM 服务器
+./scripts/run_vllm_qwen3.sh
+
+# 2. 运行评估
+python -m art_e.evaluate.benchmark_qwen3
+```
+
+**方法 4: Ollama（macOS - 工具调用有问题）**
+- ⚠️ 当前 Ollama 的工具调用与 litellm 不兼容
+- 参见 [TOOL_CALLING_SOLUTIONS.md](TOOL_CALLING_SOLUTIONS.md) 了解详情和替代方案
+
+详细文档:
+- 🔧 [TOOL_CALLING_SOLUTIONS.md](TOOL_CALLING_SOLUTIONS.md) - 工具调用问题和解决方案
+- 📚 [EVALUATE_QWEN3.md](EVALUATE_QWEN3.md) - 完整评估指南
+- 🦙 [OLLAMA_SETUP.md](OLLAMA_SETUP.md) - Ollama 设置（工具调用暂不可用）
 
 ## Project Structure
 

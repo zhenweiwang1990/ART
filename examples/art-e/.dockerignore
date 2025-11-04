@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Data and outputs
+data/
+*.db
+*.log
+outputs/
+checkpoints/
+wandb/
+training.log
+nohup.out
+
+# Documentation
+*.md
+!README.md
+
+# Mac
+.DS_Store
+
+# Scripts (不需要打包进去的)
+*.sh
+quick_start_training.sh
+manual_training.sh
+restart_training.sh
+
+# Config files (运行时挂载)
+.env
+.sky/
+
+# Temporary files
+*.tmp
+*.cache
+
