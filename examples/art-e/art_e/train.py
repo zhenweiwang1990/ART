@@ -26,7 +26,7 @@ load_dotenv()
 agent_002 = art.TrainableModel(
     name="email-agent-002",
     project="email_agent",
-    base_model="Qwen/Qwen3-14B",
+    base_model="Qwen/Qwen2.5-7B-Instruct",
     config=ProjectPolicyConfig(
         max_turns=10,
         log_to_openpipe=True,
@@ -100,12 +100,18 @@ async def run_training(model: art.TrainableModel):
         raise ValueError("Training config is not set")
     api = art.LocalAPI()
     await model.register(api)
-    print(f"Pulling from S3 bucket: `{os.environ['BACKUP_BUCKET']}`")
-    await api._experimental_pull_from_s3(
-        model,
-        s3_bucket=os.environ["BACKUP_BUCKET"],
-        verbose=True,
-    )
+    
+    # Optional S3 sync - only if BACKUP_BUCKET is set
+    backup_bucket = os.environ.get("BACKUP_BUCKET")
+    if backup_bucket:
+        print(f"Pulling from S3 bucket: `{backup_bucket}`")
+        await api._experimental_pull_from_s3(
+            model,
+            s3_bucket=backup_bucket,
+            verbose=True,
+        )
+    else:
+        print("No BACKUP_BUCKET set - using local storage only")
 
     print("Loading training data...")
     train_scenarios: List[SyntheticQuery] = load_synthetic_queries(
@@ -131,10 +137,16 @@ async def run_training(model: art.TrainableModel):
             print(f"\n--- Evaluating at Iteration {global_step} ---")
             await benchmark_model(model)
             await model.delete_checkpoints()
-            await api._experimental_push_to_s3(
-                model,
-                s3_bucket=os.environ["BACKUP_BUCKET"],
-            )
+            
+            # Optional S3 backup
+            if backup_bucket:
+                print(f"Backing up to S3 bucket: {backup_bucket}")
+                await api._experimental_push_to_s3(
+                    model,
+                    s3_bucket=backup_bucket,
+                )
+            else:
+                print("Checkpoints saved locally (no S3 backup)")
 
         groups = await art.gather_trajectory_groups(
             (
@@ -158,10 +170,17 @@ async def run_training(model: art.TrainableModel):
         )
 
     await benchmark_model(model)
-    await api._experimental_push_to_s3(
-        model,
-        s3_bucket=os.environ["BACKUP_BUCKET"],
-    )
+    
+    # Final S3 backup (optional)
+    if backup_bucket:
+        print(f"Final backup to S3 bucket: {backup_bucket}")
+        await api._experimental_push_to_s3(
+            model,
+            s3_bucket=backup_bucket,
+        )
+    else:
+        print("Model weights saved locally (no S3 backup)")
+    
     print("Training finished.")
 
 
