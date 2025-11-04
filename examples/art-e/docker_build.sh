@@ -25,9 +25,12 @@ echo "📁 项目根目录: $PROJECT_ROOT"
 
 # 构建 Docker 镜像
 echo "🔨 构建镜像 ${FULL_IMAGE_NAME}..."
+echo "⚠️  强制使用 linux/amd64 架构（训练需要 x86_64）"
+echo ""
 docker build \
     -f examples/art-e/Dockerfile \
     -t ${FULL_IMAGE_NAME} \
+    --platform linux/amd64 \
     --build-arg BUILDKIT_INLINE_CACHE=1 \
     .
 

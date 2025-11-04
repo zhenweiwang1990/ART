@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   art-e-training:
-    image: art-e-training:latest
+    image: zhenweiwang1990/art-e-training:latest
     container_name: art-e-training
     
     # GPU 配置
@@ -26,7 +26,7 @@ services:
       - ./training.log:/workspace/examples/art-e/training.log
     
     # 共享内存配置（对大模型训练很重要）
-    shm_size: '16gb'
+    shm_size: '64gb'
     
     # IPC 模式（提高多进程性能）
     ipc: host

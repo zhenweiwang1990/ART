@@ -1,0 +1,77 @@
+# SkyPilot 配置 - 在 RunPod 上使用 Docker 镜像训练
+# 用法: sky launch -c art-e-docker sky_runpod_docker.yaml
+
+name: art-e-docker-training
+
+resources:
+  cloud: runpod
+  accelerators: A40  # 可选: RTXA6000, RTXA5000
+  disk_size: 100  # GB
+
+# 上传本地文件到远程实例
+file_mounts:
+  # 上传 .env 文件（包含敏感信息）
+  ~/.config/art-e/.env: .env
+  # 可选：上传数据文件
+  # ~/data: ./data
+
+setup: |
+  set -e
+  
+  echo "=========================================="
+  echo "🐳 拉取 Docker 镜像"
+  echo "=========================================="
+  
+  # 替换为你的 Docker Hub 用户名
+  DOCKER_IMAGE="YOUR_USERNAME/art-e-training:latest"
+  
+  # 拉取镜像
+  docker pull $DOCKER_IMAGE
+  
+  # 验证镜像
+  docker images | grep art-e-training
+  
+  # 检查 .env 文件
+  if [ ! -f ~/.config/art-e/.env ]; then
+    echo "❌ 错误: .env 文件未找到"
+    echo "请确保在本地有 .env 文件，SkyPilot 会自动上传"
+    exit 1
+  fi
+  
+  echo "✅ 设置完成"
+
+run: |
+  set -e
+  
+  echo "=========================================="
+  echo "🚀 启动训练"
+  echo "=========================================="
+  
+  # 创建必要的目录
+  mkdir -p ~/checkpoints ~/output ~/wandb
+  
+  # 替换为你的 Docker Hub 用户名
+  DOCKER_IMAGE="YOUR_USERNAME/art-e-training:latest"
+  
+  # 运行 Docker 容器进行训练
+  docker run --rm --gpus all \
+    --env-file ~/.config/art-e/.env \
+    -v ~/checkpoints:/workspace/examples/art-e/checkpoints \
+    -v ~/output:/workspace/examples/art-e/output \
+    -v ~/wandb:/workspace/examples/art-e/wandb \
+    --shm-size 64gb \
+    --name art-e-training \
+    $DOCKER_IMAGE \
+    uv run python art_e/train.py
+  
+  echo "=========================================="
+  echo "✅ 训练完成"
+  echo "=========================================="
+  
+  # 列出生成的检查点
+  echo "检查点:"
+  ls -lh ~/checkpoints/
+  
+  echo "输出:"
+  ls -lh ~/output/
+

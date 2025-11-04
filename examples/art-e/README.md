@@ -49,21 +49,25 @@ To generate training data, the system:
 # 1. 构建镜像
 ./docker_build.sh
 
-# 2. 配置环境变量
-cp .env.template .env
-# 编辑 .env 文件
+# 2. 推送到 Docker Hub (用于云端部署)
+./docker_push_only.sh
 
-# 3. 运行训练
+# 3. 配置环境变量
+cp env.template .env
+# 编辑 .env 文件，填写 API keys
+
+# 4. 本地运行测试
 ./docker_run.sh
 
 # 或使用 make 命令
 make build
+make push
 make run
 ```
 
 📖 **详细文档**: 
-- 完整指南: `DOCKER_TRAINING_GUIDE.md`
-- 快速参考: `DOCKER_QUICK_REF.md`
+- **Docker 构建**: 见上述命令
+- **RunPod 云端训练**: `RUNPOD_QUICKSTART.md` ⭐ (推荐)
 
 ### Option B: 直接安装（适合本地开发）
 
@@ -109,6 +113,29 @@ python -c "from art_e.data.local_email_db import generate_database; generate_dat
 ```
 
 ### Training Models
+
+#### 🚀 使用 Docker 在 RunPod 上训练（推荐）⭐
+
+最简单的方式是使用已构建好的 Docker 镜像在 RunPod 上训练：
+
+**快速启动 (5 分钟)**:
+
+1. 访问 [RunPod Console](https://www.runpod.io/console/pods)
+2. 点击 "+ Deploy"，选择 A100-80GB GPU
+3. 配置 Docker 镜像: `YOUR_USERNAME/art-e-training:latest`
+4. 添加环境变量（AWS credentials, WANDB_API_KEY 等）
+5. 启动 Pod 并运行: `./start_runpod_training.sh`
+
+📖 **详细指南**:
+- **快速开始**: `RUNPOD_QUICKSTART.md` ⭐
+- **完整文档**: `RUNPOD_TRAINING_GUIDE.md`
+- **SkyPilot 配置**: `sky_runpod_docker.yaml`
+
+**成本**: A100-80GB ~$2/小时，训练约 10-15 小时，总成本 $20-30
+
+---
+
+#### 使用 SkyPilot (原始方法)
 
 I used `skypilot` with the [Runpod](https://www.runpod.io/) backend to train these models. Once you've authenticated Runpod for use with skypilot, the following command should start a training job that replicates our reported results:
 

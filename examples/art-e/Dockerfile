@@ -1,5 +1,6 @@
 # 使用 NVIDIA CUDA 基础镜像（包含 CUDA 12.4）
-FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+# 明确指定 linux/amd64 平台以确保获取 x86_64 版本
+FROM --platform=linux/amd64 nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 # 设置环境变量
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -9,15 +10,19 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # 安装系统依赖
 RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa -y \
+    && apt-get update && apt-get install -y \
     python3.12 \
     python3.12-dev \
-    python3-pip \
+    python3.12-venv \
     git \
     wget \
     curl \
     build-essential \
     libssl-dev \
     libffi-dev \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装 uv（快速的 Python 包管理器）
@@ -32,30 +37,12 @@ COPY . /workspace/
 # 安装 Python 依赖
 WORKDIR /workspace/examples/art-e
 
-# 同步 art-e 的依赖
+# 同步 art-e 的依赖（包含所有必需的包）
 RUN uv sync
 
-# 安装额外的训练依赖
-RUN uv pip install \
-    torch==2.6.0 \
-    transformers==4.51.1 \
-    peft==0.17.1 \
-    trl==0.24.0 \
-    wandb==0.22.3 \
-    openai==1.66.3 \
-    awscli \
-    polars \
-    vllm==0.8.5 \
-    setproctitle \
-    seaborn \
-    matplotlib \
-    bitsandbytes==0.48.2 \
-    typer \
-    tblib \
-    litellm
-
-# 安装 unsloth（需要源码编译）
-RUN uv pip install "unsloth[cu124-torch250] @ git+https://github.com/unslothai/unsloth.git" --no-build-isolation
+# 注意：uv sync 已经安装了所有依赖，包括：
+# - torch, transformers, peft, trl, wandb, vllm 等
+# - unsloth 会在运行时通过 uv 自动处理
 
 # 设置 Python 路径
 ENV PYTHONPATH=/workspace/src:$PYTHONPATH
