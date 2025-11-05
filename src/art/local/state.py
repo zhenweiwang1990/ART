@@ -2,10 +2,21 @@ import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 import gc
-import unsloth  # type: ignore
+import os
+
+# Conditionally import unsloth based on IMPORT_UNSLOTH environment variable
+# Set IMPORT_UNSLOTH=0 to skip unsloth (useful for non-Linux or debugging)
+if os.environ.get("IMPORT_UNSLOTH", "1") == "1":
+    try:
+        import unsloth  # type: ignore
+    except ImportError:
+        print("Warning: unsloth not available, continuing without it")
+        unsloth = None  # type: ignore
+else:
+    unsloth = None  # type: ignore
+
 from datasets import Dataset
 import nest_asyncio
-import os
 import peft
 import torch
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
@@ -75,21 +86,69 @@ class ModelState:
             return from_engine_args(engine_args, *args, **kwargs)
 
         AsyncLLMEngine.from_engine_args = _from_engine_args
-        self.model, self.tokenizer = cast(
-            tuple[CausallLM, PreTrainedTokenizerBase],
-            unsloth.FastLanguageModel.from_pretrained(**config.get("init_args", {})),
-        )
+        
+        # Load model and tokenizer - use unsloth if available, otherwise standard transformers
+        if unsloth is not None:
+            self.model, self.tokenizer = cast(
+                tuple[CausallLM, PreTrainedTokenizerBase],
+                unsloth.FastLanguageModel.from_pretrained(**config.get("init_args", {})),
+            )
+        else:
+            # Fallback to standard transformers/peft without unsloth optimizations
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+            init_args = config.get("init_args", {}).copy()
+            model_name = init_args.pop("model_name", None)
+            if not model_name:
+                raise ValueError("model_name required in init_args")
+            
+            # Filter out unsloth/vLLM-specific parameters that transformers doesn't recognize
+            # Based on InitArgs in src/art/dev/model.py
+            unsloth_vllm_only_params = {
+                'max_seq_length', 'fast_inference', 'gpu_memory_utilization',
+                'float8_kv_cache', 'random_state', 'max_lora_rank',
+                'disable_log_stats', 'enable_prefix_caching', 'use_async',
+                'full_finetuning', 'fix_tokenizer', 'use_gradient_checkpointing',
+                'resize_model_vocab', 'use_exact_model_name', 'rope_scaling',
+                'load_in_4bit', 'load_in_8bit', 'dtype'  # Handled separately via quantization_config
+            }
+            filtered_args = {k: v for k, v in init_args.items() if k not in unsloth_vllm_only_params}
+            
+            # Handle quantization config separately if needed
+            if init_args.get('load_in_4bit') or init_args.get('load_in_8bit'):
+                from transformers import BitsAndBytesConfig
+                bnb_config = BitsAndBytesConfig(
+                    load_in_4bit=init_args.get('load_in_4bit', False),
+                    load_in_8bit=init_args.get('load_in_8bit', False),
+                )
+                filtered_args['quantization_config'] = bnb_config
+            
+            self.model = AutoModelForCausalLM.from_pretrained(model_name, **filtered_args)
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        
         AsyncLLMEngine.from_engine_args = from_engine_args
         torch.cuda.empty_cache = empty_cache
         torch.cuda.empty_cache()
         self.vllm = vLLMState(self.model.vllm_engine, enable_sleep_mode)
-        # Initialize PEFT model
-        self.peft_model = cast(
-            peft.peft_model.PeftModelForCausalLM,
-            unsloth.FastLanguageModel.get_peft_model(
-                self.model, **config.get("peft_args", {})
-            ),
-        )
+        
+        # Initialize PEFT model - use unsloth if available, otherwise standard peft
+        if unsloth is not None:
+            self.peft_model = cast(
+                peft.peft_model.PeftModelForCausalLM,
+                unsloth.FastLanguageModel.get_peft_model(
+                    self.model, **config.get("peft_args", {})
+                ),
+            )
+        else:
+            # Fallback to standard peft
+            from peft import get_peft_model, LoraConfig
+            peft_args = config.get("peft_args", {})
+            # Convert unsloth-style args to peft-style if needed
+            if "r" in peft_args:
+                lora_config = LoraConfig(**peft_args)
+                self.peft_model = get_peft_model(self.model, lora_config)
+            else:
+                raise ValueError("peft_args must contain LoRA configuration")
+        
         self.lora_model = cast(peft.tuners.lora.LoraModel, self.peft_model.base_model)
         # Initialize trainer
         data = {"prompt": ""}

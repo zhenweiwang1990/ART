@@ -99,9 +99,10 @@ class LocalAPI:
                     os.environ["IMPORT_PEFT"] = "1"
                 # When moving the service to a child process, import unsloth
                 # early to maximize optimizations (Linux only)
+                # Only set if not already explicitly configured by user
                 import sys
                 if sys.platform == "linux":
-                    os.environ["IMPORT_UNSLOTH"] = "1"
+                    os.environ.setdefault("IMPORT_UNSLOTH", "1")
                 self._services[model.name] = move_to_child_process(
                     self._services[model.name],
                     process_name="model-service",

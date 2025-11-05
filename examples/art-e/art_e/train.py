@@ -1,13 +1,17 @@
 import os
 import sys
 
+# Load .env FIRST - before any other imports
+# This ensures WANDB_API_KEY and other env vars are available to all modules
+from dotenv import load_dotenv
+load_dotenv()
+
 # Set environment variables before importing art to avoid unsloth import issues
 # unsloth is Linux-specific and not available on all platforms
 os.environ.setdefault("IMPORT_UNSLOTH", "0")
 
 import art
 import asyncio
-from dotenv import load_dotenv
 from typing import List
 from rollout import rollout
 from art_e.data.query_iterators import load_synthetic_queries
@@ -16,8 +20,6 @@ from art_e.data.local_email_db import generate_database
 from art.utils import iterate_dataset
 from art_e.project_types import ProjectPolicyConfig, TrainingConfig
 from art_e.evaluate.benchmark import benchmark_model
-
-load_dotenv()
 
 # First, I defined a trainable model. The `ProjectPolicyConfig` contains the
 # specific parameters I varied between runs for this project. They're
@@ -92,14 +94,14 @@ assert isinstance(agent_014.config, ProjectPolicyConfig)
 agent_014.config.stupid_simple_reward_fn = True
 
 
-# Qwen3-14B (QLoRA via Unsloth) – memory-aware defaults
+# Qwen2.5-14B (QLoRA via Unsloth) – memory-aware defaults
 # - Use 4bit loading (default in ART dev model config)
 # - Reduce per-step group size for 14B to keep VRAM in check
 # - You can bump these once confirmed stable on your GPU
 agent_qwen3_14b = art.TrainableModel(
-    name="email-agent-qwen3-14b",
+    name="email-agent-qwen25-14b",
     project="email_agent",
-    base_model="Qwen/Qwen3-14B-Instruct",
+    base_model="Qwen/Qwen2.5-14B-Instruct",
     config=ProjectPolicyConfig(
         max_turns=30,
         use_tools=True,
