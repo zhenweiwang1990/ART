@@ -191,8 +191,9 @@ class LocalAPI:
         service = await self._get_service(model)
         await service.start_openai_server(config=config)
         server_args = (config or {}).get("server_args", {})
-
-        base_url = f"http://{server_args.get('host', '0.0.0.0')}:{server_args.get('port', 8000)}/v1"
+        host = server_args.get("host", "0.0.0.0")
+        client_host = "localhost" if host in (None, "0.0.0.0", "::") else host
+        base_url = f"http://{client_host}:{server_args.get('port', 8000)}/v1"
         api_key = server_args.get("api_key", None) or "default"
 
         return base_url, api_key

@@ -44,11 +44,13 @@ class OpenAIServerConfig(TypedDict, total=False):
                      Note that since the vLLM engine is initialized with Unsloth,
                      these additional arguments will only have an effect if the
                      OpenAI-compatible server uses them elsewhere.
+        startup_timeout_seconds: How long to wait for the OpenAI server to become reachable.
     """
 
     log_file: str
     server_args: "ServerArgs"
     engine_args: "EngineArgs"
+    startup_timeout_seconds: float
 
 
 class ServerArgs(TypedDict, total=False):

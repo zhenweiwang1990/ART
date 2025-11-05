@@ -57,24 +57,29 @@ async def openai_server_task(
     api_server.build_async_engine_client = build_async_engine_client
     openai_server_task = asyncio.create_task(_openai_server_coroutine(config))
     server_args = config.get("server_args", {})
+    # Use a reachable host for the client (0.0.0.0 is a bind address, not routable)
+    _host = server_args.get("host", "0.0.0.0")
+    _client_host = "localhost" if _host in (None, "0.0.0.0", "::") else _host
     client = AsyncOpenAI(
         api_key=server_args.get("api_key"),
-        base_url=f"http://{server_args.get('host', '0.0.0.0')}:{server_args.get('port', 8000)}/v1",
+        base_url=f"http://{_client_host}:{server_args.get('port', 8000)}/v1",
     )
 
     async def test_client() -> None:
         while True:
             try:
-                async for _ in client.models.list():
-                    return
-            except:
-                pass
+                # When server is ready this call succeeds; otherwise it raises
+                await client.models.list()
+                return
+            except Exception:
+                await asyncio.sleep(0.5)
 
     test_client_task = asyncio.create_task(test_client())
     try:
+        startup_timeout_seconds = float(config.get("startup_timeout_seconds", 120.0))
         done, _ = await asyncio.wait(
             [openai_server_task, test_client_task],
-            timeout=10.0,
+            timeout=startup_timeout_seconds,
             return_when="FIRST_COMPLETED",
         )
         if not done:
