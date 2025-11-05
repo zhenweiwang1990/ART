@@ -247,7 +247,7 @@ async def rollout(
 
         litellm_model_name = model.config.litellm_model_name
         if litellm_model_name is None:
-            litellm_model_name = f"hosted_vllm/{model.name}"
+            litellm_model_name = f"openai/{model.name}"
 
         # 安全地获取 trainable 属性（普通 Model 没有此属性）
         is_trainable = getattr(model, 'trainable', False)
