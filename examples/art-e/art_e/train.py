@@ -6,9 +6,10 @@ import sys
 from dotenv import load_dotenv
 load_dotenv()
 
-# Set environment variables before importing art to avoid unsloth import issues
-# unsloth is Linux-specific and not available on all platforms
-os.environ.setdefault("IMPORT_UNSLOTH", "0")
+# Set environment variables before importing art
+# Enable unsloth for optimal training performance on Linux/CUDA systems
+# Set IMPORT_UNSLOTH=0 only if unsloth is unavailable or you encounter issues
+os.environ.setdefault("IMPORT_UNSLOTH", "1")
 
 import art
 import asyncio

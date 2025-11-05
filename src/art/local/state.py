@@ -124,6 +124,20 @@ class ModelState:
             
             self.model = AutoModelForCausalLM.from_pretrained(model_name, **filtered_args)
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+            
+            # Create vLLM engine manually since unsloth doesn't do it for us
+            engine_args_dict = config.get("engine_args", {}).copy()
+            engine_args_dict["model"] = model_name
+            # Set reasonable defaults for vLLM if not specified
+            engine_args_dict.setdefault("tensor_parallel_size", 1)
+            if init_args.get('load_in_4bit'):
+                engine_args_dict.setdefault("quantization", "bitsandbytes")
+            
+            vllm_engine_args = AsyncEngineArgs(**engine_args_dict)
+            vllm_engine = AsyncLLMEngine.from_engine_args(vllm_engine_args)
+            
+            # Attach the vLLM engine to the model so it can be accessed later
+            self.model.vllm_engine = vllm_engine  # type: ignore
         
         AsyncLLMEngine.from_engine_args = from_engine_args
         torch.cuda.empty_cache = empty_cache
