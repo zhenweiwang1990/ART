@@ -22,7 +22,7 @@ import textwrap
 from tenacity import retry, stop_after_attempt
 
 litellm.cache = Cache(type=LiteLLMCacheType.DISK)
-# litellm._turn_on_debug()
+litellm._turn_on_debug()
 
 # Initialize OpenPipe client (ensure OPENPIPE_API_KEY is in your .env)
 if os.getenv("OPENPIPE_API_KEY"):
