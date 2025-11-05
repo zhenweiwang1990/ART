@@ -432,11 +432,11 @@ if __name__ == "__main__":
     traj = asyncio.run(
         rollout(
             art.Model(
-                name="gpt-4o",
+                name="gpt-5-nano-2025-08-07",
                 project="email_agent",
                 config=ProjectPolicyConfig(
                     log_to_openpipe=False,
-                    litellm_model_name="openai/gpt-4o",
+                    litellm_model_name="openai/gpt-5-nano-2025-08-07",
                     use_tools=True,
                 ),
             ),

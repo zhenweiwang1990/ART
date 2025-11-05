@@ -92,6 +92,30 @@ assert isinstance(agent_014.config, ProjectPolicyConfig)
 agent_014.config.stupid_simple_reward_fn = True
 
 
+# Qwen3-14B (QLoRA via Unsloth) – memory-aware defaults
+# - Use 4bit loading (default in ART dev model config)
+# - Reduce per-step group size for 14B to keep VRAM in check
+# - You can bump these once confirmed stable on your GPU
+agent_qwen3_14b = art.TrainableModel(
+    name="email-agent-qwen3-14b",
+    project="email_agent",
+    base_model="Qwen/Qwen3-14B-Instruct",
+    config=ProjectPolicyConfig(
+        max_turns=30,
+        use_tools=True,
+        training_config=TrainingConfig(
+            trajectories_per_group=3,   # 2–4 recommended for 14B
+            groups_per_step=8,          # 8–12; raise cautiously if VRAM allows
+            learning_rate=1.0e-5,       # good starting LR for GRPO + LoRA
+            eval_steps=30,
+            val_set_size=100,
+            training_dataset_size=4000,
+            num_epochs=1,
+        ),
+    ),
+)
+
+
 async def run_training(model: art.TrainableModel):
     generate_database()
 
@@ -209,6 +233,8 @@ if __name__ == "__main__":
         config = agent_013
     elif training_config == "014":
         config = agent_014
+    elif training_config == "QWEN3_14B":
+        config = agent_qwen3_14b
     else:
         raise ValueError(f"Invalid RUN_ID: {training_config}")
 
